@@ -2,9 +2,13 @@
 set -euo pipefail
 
 usage() {
-    echo "pomodoro [-s seconds] [-t time]"
-    echo " -t  TASK TIME    length of time before break (in minutes)"
-    echo " -b  BREAK TIME   length of break (in minutes)"
+    echo "pomodoro [-t T minutes] [-b B minutes]"
+    echo "Schedule the screen to lock for B minutes in T minutes from now"
+    echo ""
+    echo "   -t|--time  MINUTES   minutes before break (default 25)"
+    echo "   -b|--break MINUTES   length of break (default 10)"
+    echo "   -r|--repeat          repeat the timer"
+    echo "   -h|--help            show this help"
 }
 
 task_minutes=25
