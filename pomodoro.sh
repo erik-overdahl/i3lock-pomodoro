@@ -51,7 +51,7 @@ if [ "${repeat}" == 1 ]; then
 fi
 
 var1=$(cat <<-EOF
-export DISPLAY=:0
+export DISPLAY=${DISPLAY}
 
 make_background() {
     maim --hidecursor | convert - -scale 2.5% -resize 4000% "${screenshot_filename}"
