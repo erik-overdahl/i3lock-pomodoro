@@ -9,6 +9,7 @@ usage() {
 
 task_minutes=25
 break_minutes=10
+repeat=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -20,6 +21,9 @@ while [[ $# -gt 0 ]]; do
              shift
              task_minutes="$1"
              ;;
+         -r|--repeat )
+             shift
+             repeat=1
              ;;
          -h|--help )
              usage
@@ -36,6 +40,11 @@ pomodoro_end_time_seconds=$((pomodoro_start_time_seconds + $((task_minutes * 60)
 break_end_time_seconds=$((pomodoro_end_time_seconds + $((60 * break_minutes))))
 break_end_time=$(date +%I:%M --date="@${break_end_time_seconds}")
 screenshot_filename="/tmp/pomodoro-bkg-$(date +%s).png"
+
+repeat_cmd=""
+if [ "${repeat}" == 1 ]; then
+    repeat_cmd="pomodoro -t ${task_minutes} -b ${break_minutes} -r"
+fi
 
 var1=$(cat <<-EOF
 export DISPLAY=:0
@@ -67,11 +76,14 @@ lock_screen
 while [ $
 EOF
     )
+
 var2=$(cat <<-EOF
 (date +%s) -lt ${break_end_time_seconds} ]; do
       lock_screen
 done
 rm ${screenshot_filename}
+
+${repeat_cmd}
 EOF
     )
 
