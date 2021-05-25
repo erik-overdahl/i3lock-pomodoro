@@ -1,0 +1,46 @@
+#+TITLE: A Pomodoro Timer That Locks You Out
+
+There are tons of pomodoro timers out there, some simple, some complex, but in
+my experience they all have the same problem.
+
+The alarm goes off and I think "huh" and keep working.
+
+This is a bash script that uses [[https://github.com/Raymo111/i3lock-color][i3lock-color]] to completely lock your screen when
+the timer goes off and then keeps you out for the duration of the break, forcing
+you to step away from your work for a moment.
+
+This is a super simple tool. It just schedules a time for the screen to lock,
+and then pops the lock screen back up immediately if you try to get in during
+the break. There is no timer indicating how much time is left. There are no
+provisions for not locking the screen in certain cases (like if you are watching
+a fullscreen video). And I have no idea how it performs with multiple monitors.
+
+* Usage
+#+begin_example
+pomodoro [-t T minutes] [-b B minutes]
+Schedule the screen to lock for B minutes in T minutes from now
+
+ -t|--time  MINUTES   minutes before break (default 25)
+ -b|--break MINUTES   length of break (default 10)
+ -r|--repeat          repeat the timer
+ -h|--help            show this help
+#+end_example
+
+The ~-r~ flag causes a new break to be scheduled upon the user unlocking the
+screen after the break is completed. This process will continue indefinitely
+until the next break is cancelled.
+
+The scheduling and job control is handled by the [[https://linux.die.net/man/1/at][at]] utility. If you have a
+break scheduled, you can cancel it by first getting the job number with ~atq~
+and then cancel it with ~atrm <job number>~.
+
+* Install
+You will need the following dependencies installed
+
+- [[https://github.com/Raymo111/i3lock-color][i3lock-color]]
+- [[https://github.com/naelstrof/maim][maim]] screenshot tool (although this could easily be swapped out)
+- [[https://linux.die.net/man/1/at][at]] is used for scheduling the run
+- [[https://imagemagick.org/script/convert.php][convert]], part of the imagemagick suite
+
+Then create a ~pomodoro~ symlink to the ~pomodoro.sh~ script somewhere in your
+~$PATH~.
