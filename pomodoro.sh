@@ -10,21 +10,24 @@ usage() {
 task_minutes=25
 break_minutes=10
 
-while getopts 'hb:t:' flag; do
-    case "${flag}" in
-         b)
-             break_minutes="${OPTARG}"
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+         -b|--break )
+             shift
+             break_minutes="$1"
              ;;
-         t)
-             task_minutes="${OPTARG}"
+         -t|--time )
+             shift
+             task_minutes="$1"
              ;;
-         h|*)
+             ;;
+         -h|--help )
              usage
              exit
              ;;
     esac
+    shift
 done
-shift $((OPTIND-1))
 
 #round to beginning of minute
 pomodoro_start_time=$(date +'%F %H%M')
