@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# set -x
 set -euo pipefail
 
 usage() {
@@ -26,7 +27,6 @@ while [[ $# -gt 0 ]]; do
              task_minutes="$1"
              ;;
          -r|--repeat )
-             shift
              repeat=1
              ;;
          -h|--help )
