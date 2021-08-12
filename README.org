@@ -15,32 +15,34 @@ the break. There is no timer indicating how much time is left. There are no
 provisions for not locking the screen in certain cases (like if you are watching
 a fullscreen video). And I have no idea how it performs with multiple monitors.
 
-* Usage
-#+begin_example
-pomodoro [-t T minutes] [-b B minutes]
-Schedule the screen to lock for B minutes in T minutes from now
-
- -t|--time  MINUTES   minutes before break (default 25)
- -b|--break MINUTES   length of break (default 10)
- -r|--repeat          repeat the timer
- -h|--help            show this help
-#+end_example
-
-The ~-r~ flag causes a new break to be scheduled upon the user unlocking the
-screen after the break is completed. This process will continue indefinitely
-until the next break is cancelled.
-
-The scheduling and job control is handled by the [[https://linux.die.net/man/1/at][at]] utility. If you have a
-break scheduled, you can cancel it by first getting the job number with ~atq~
-and then cancel it with ~atrm <job number>~.
-
 * Install
 You will need the following dependencies installed
 
-- [[https://github.com/Raymo111/i3lock-color][i3lock-color]]
+- [[https://github.com/Raymo111/i3lock-color][i3lock-color]] (version 2.13.c.3, anything older you will need to change the
+  options flags to their pre-standardized versions)
 - [[https://github.com/naelstrof/maim][maim]] screenshot tool (although this could easily be swapped out)
-- [[https://linux.die.net/man/1/at][at]] is used for scheduling the run
 - [[https://imagemagick.org/script/convert.php][convert]], part of the imagemagick suite
+- systemd
 
-Then create a ~pomodoro~ symlink to the ~pomodoro.sh~ script somewhere in your
-~$PATH~.
+Then clone this repo and run the ~install.sh~ script, which symlinks the
+necessary files to appropriate locations. (Using symlinks makes it easier to
+change behavior without chasing all over the file system.)
+
+* Usage
+The timer will start when you login after boot. The default time is 35 minutes
+with a 10 minute break.
+
+To start the timer manually, run
+
+#+begin_src shell
+systemctl --user start screenlock.timer
+#+end_src
+
+This will start the timer with a remaining time RELATIVE TO BOOT TIME (I think),
+not relative to the time you invoke the command.
+
+To cancel a timer, run
+
+#+begin_src shell
+systemctl --user stop screenlock.timer
+#+end_src
