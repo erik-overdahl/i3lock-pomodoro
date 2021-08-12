@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-set -x
 
 make_background() {
     maim --hidecursor | convert - -scale 2.5% -resize 4000% "${screenshot_filename}"

@@ -2,7 +2,7 @@
 Description=Part of Pomodoro. Locks user out by locking screen and disallowing entry until time is up.
 
 [Service]
-EnvironmentFile=%h/.config/pomodoro/env
+# EnvironmentFile=%h/.config/pomodoro/env
 ExecStart=%h/.local/bin/screenlock-loop
 
 [Install]
