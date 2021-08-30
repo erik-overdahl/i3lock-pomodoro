@@ -2,10 +2,11 @@
 set -euo pipefail
 
 make_background() {
-    maim --hidecursor | convert - -scale 2.5% -resize 4000% "${screenshot_filename}"
+    if [[ "$wayland" == 1 ]]; then grim -t png -; else main --hidecursor; fi |
+            convert - -scale 2.5% -resize 4000% "${screenshot_filename}"
 }
 
-lock_screen() {
+x_lock_screen() {
     i3lock \
         -n \
         -i "${screenshot_filename}" \
@@ -48,16 +49,42 @@ lock_screen() {
         --no-modkey-text
 }
 
+wayland_lock_screen() {
+        swaylock \
+                -i "${screenshot_filename}" \
+                --indicator \
+                --clock \
+                --timestr "%T  --  ${break_end_time}" \
+                --datestr "Time for a ${break_minutes} minute break" \
+                --font-size 36 \
+                --ring-color ffffff00 \
+                --inside-color ffffff00 \
+                --line-color ffffff00 \
+                --grace 360000 \
+                --grace-no-mouse \
+                --grace-no-touch
+}
+
 screenshot_filename="/tmp/pomodoro-bkg-$(date +%s).png"
 break_minutes=${BREAK_MINUTES:-10}
 break_start_time=$(date +%s --date="$(date +'%F %H%M')")
 break_end_time_seconds=$((break_start_time + $((60 * break_minutes))))
 break_end_time=$(date +%I:%M --date="@${break_end_time_seconds}")
+wayland=0
+lock_screen=x_lock_screen
 
-make_background
+if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
+        wayland=1
+        lock_screen=wayland_lock_screen
+fi
 
+time make_background
+"$lock_screen"
 while [ "$(date +%s)" -lt ${break_end_time_seconds} ]; do
-        lock_screen
+        "$lock_screen"
 done
 
-rm "${screenshot_filename}"
+if [ -z "${screenshot_filename}" ]; then
+        rm "${screenshot_filename}"
+fi
+
