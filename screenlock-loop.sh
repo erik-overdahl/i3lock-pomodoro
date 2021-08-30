@@ -88,3 +88,16 @@ if [ -z "${screenshot_filename}" ]; then
         rm "${screenshot_filename}"
 fi
 
+systemd-run -q \
+        --on-active=30min \
+        --user \
+        --timer-property=AccuracySec=1us \
+        --unit="screenlock-notify-5min" \
+        /home/francis/.local/bin/screenlock-notify 5
+
+systemd-run -q \
+        --on-active=34min \
+        --user \
+        --timer-property=AccuracySec=1us \
+        --unit="screenlock-notify-1min" \
+        /home/francis/.local/bin/screenlock-notify 1
