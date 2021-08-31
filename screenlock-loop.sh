@@ -53,10 +53,11 @@ wayland_lock_screen() {
         swaylock \
                 -i "${screenshot_filename}" \
                 --indicator \
+                --indicator-radius 300 \
                 --clock \
+                --text-color ff0000ff \
                 --timestr "%T  --  ${break_end_time}" \
                 --datestr "Time for a ${break_minutes} minute break" \
-                --font-size 36 \
                 --ring-color ffffff00 \
                 --inside-color ffffff00 \
                 --line-color ffffff00 \
