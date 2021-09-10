@@ -16,13 +16,6 @@ OPTIONS
   -h|--help            show this help\n"
 }
 
-containsElement () {
-  local e match="$1"
-  shift
-  for e; do [[ "$e" == "$match" ]] && return 0; done
-  return 1
-}
-
 _create_links() {
     local installDir
     installDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
