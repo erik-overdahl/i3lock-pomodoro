@@ -58,7 +58,7 @@ _check_i3_deps() {
     if ! grep -q 'i3lock-color' "$(man -w i3lock)"; then
         printf "'i3lock' must be version 'i3lock-color'\n" >&2
         exit 1
-    elif version_gt "${i3lockMinVersion}" "${i3lockInstalledVersion}"; then
+    elif _version_gt "${i3lockMinVersion}" "${i3lockInstalledVersion}"; then
         printf "Minimum i3lock version not installed: requires %s, found %s\n" "${i3lockMinVersion}" "${i3lockInstalledVersion}" >&2
         exit 1
     fi
@@ -83,7 +83,7 @@ _check_wayland_deps() {
 _make_background() {
     if [[ "$XDG_SESSION_TYPE" == "wayland" ]]; then
         grim -t png -
-    else main --hidecursor
+    else maim --hidecursor
     fi | convert - -scale 2.5% -resize 4000% "${screenshot_filename}"
 }
 
