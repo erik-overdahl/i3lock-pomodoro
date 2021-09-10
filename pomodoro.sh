@@ -174,7 +174,8 @@ _lock() {
     fi
 
     if [ -n "${repeat}" ]; then
-        "$progPath" start -r -t "$task_minutes" -b "$break_minutes"
+        "$progPath" start -r -t "$task_minutes" -b "$break_minutes" || \
+            notify-send -u critical -a "Screenlock" "Pomodoro repeat failed!"
     fi
 }
 
@@ -183,9 +184,10 @@ _notify() {
 }
 
 _status() {
-    systemctl --user --no-pager -o json list-timers screenlock |
+    systemctl --user --no-pager -o json list-timers |
         jq '.[]
-            | select(.unit=="screenlock.timer")
+            | if .next then . else empty end
+            | select(.unit|test("screenlock-[0-9]+.timer"))
             | (.next |= ((. / 1000000) - now | strftime("%H:%M:%S")))
             | .next'
 }
@@ -207,7 +209,7 @@ notify() {
     local timeBefore
     timeBefore="$1"
     run_after_time "$((task_minutes - timeBefore))" \
-        "screenlock-notify-${timeBefore}-min.timer" \
+        "screenlock-$(date +%s)-notify-${timeBefore}-min.timer" \
         "$progPath" _notify "$timeBefore"
 }
 
@@ -216,11 +218,11 @@ start() {
         printf "There is already a timer running, with %s minutes remaining\n" "$(_status)"
         exit 1
     else
-        run_after_time "${task_minutes}" "screenlock.timer" \
+        run_after_time "${task_minutes}" "screenlock-$(date +%s).timer" \
             "$progPath" _lock "$repeat" -t "$task_minutes" -b "$break_minutes"
         for time in "${notifyBefore[@]}"; do
-            if [ "$time" -gt "$task_minutes" ]; then
-                notify "$time"
+            if [ "$time" -lt "$task_minutes" ]; then
+                notify "$time" || printf "unable to start notification timer!"
             fi
         done
     fi
@@ -229,8 +231,8 @@ start() {
 
 stop() {
     if _status | grep -q '.'; then
-        systemctl --user stop screenlock.timer &> /dev/null
-        systemctl --user stop screenlock-notify-* &> /dev/null
+        systemctl --user stop screenlock-*.timer &> /dev/null
+        # systemctl --user stop screenlock-notify-* &> /dev/null
         printf "Stopped timer\n"
     else
         printf "No timer running.\n"

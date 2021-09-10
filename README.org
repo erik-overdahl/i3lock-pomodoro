@@ -44,10 +44,11 @@ You will need the following dependencies installed
 
 - systemd
 - [[https://imagemagick.org/script/convert.php][convert]], part of the ImageMagick suite
+- [[https://stedolan.github.io/jq/][jq]]
 
 If using i3:
-- [[https://github.com/Raymo111/i3lock-color][i3lock-color]] (version 2.13.c.3, anything older you will need to change the
-  options flags to their pre-standardized versions)
+- [[https://github.com/Raymo111/i3lock-color][i3lock-color]] (minimum version 2.13.c.3, anything older you will need to change
+  the options flags to their pre-standardized versions)
 - [[https://github.com/naelstrof/maim][maim]] screenshot tool (although this could easily be swapped out)
 
 If using Sway:
