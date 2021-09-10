@@ -2,6 +2,7 @@
 set -euo pipefail
 
 progPath="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/$(basename "$0")"
+deps=( "convert" "dateutils.ddiff" )
 
 usage() {
     printf "pomodoro [OPTIONS] <COMMAND>\n
@@ -43,7 +44,7 @@ _version_gt() {
 }
 
 _check_i3_deps() {
-    dependencies=( "i3lock" "convert" "maim" )
+    dependencies=("${deps[@]}" "i3lock" "maim" )
 
     for dep in "${dependencies[@]}"; do
         if [ ! "$(command -v "${dep}")" ]; then
@@ -65,7 +66,7 @@ _check_i3_deps() {
 }
 
 _check_wayland_deps() {
-    dependencies=( "swaylock" "grim" "convert" )
+    dependencies=("${deps[@]}" "swaylock" "grim" )
 
     for dep in "${dependencies[@]}"; do
         if [ ! "$(command -v "${dep}")" ]; then
@@ -177,12 +178,32 @@ _notify() {
 }
 
 _status() {
-    systemctl --user --no-pager -o json list-timers |
-        jq '.[]
-            | if .next then . else empty end
-            | select(.unit|test("screenlock-[0-9]+.timer"))
-            | (.next |= ((. / 1000000) - now | strftime("%H:%M:%S")))
-            | .next'
+    gdbus call --session \
+        --dest org.freedesktop.systemd1 \
+        --object-path /org/freedesktop/systemd1 \
+        --method org.freedesktop.systemd1.Manager.ListUnits |
+        sed -e 's#),#),\n#g' -e 's#[()'\'']##g' |
+        awk 'BEGIN {FS=","} /screenlock-[0-9]+.timer/ {print $7}' |
+        xargs -I '{}' \
+            gdbus call --session \
+            --dest org.freedesktop.systemd1 \
+            --object-path '{}' \
+            --method org.freedesktop.DBus.Properties.Get \
+            org.freedesktop.systemd1.Timer \
+            TimersCalendar |
+        awk 'BEGIN {FS=", "} {gsub(/[(<>)\[\]]/, ""); print $2}' |
+        xargs -I '{}' date -d 'TZ="UTC+%z" {}'
+}
+
+time_remaining() {
+    local nextLock
+    nextLock=$(_status)
+    if [ -n "${nextLock}" ]; then
+    dateutils.ddiff -f '%H hours, %M min, and %S seconds' \
+        -i '%a %d %b %Y %T' \
+        "$(date)" \
+        "${nextLock}"
+    fi
 }
 
 run_after_time() {
@@ -193,7 +214,7 @@ run_after_time() {
     systemd-run -q \
         --user \
         --timer-property=AccuracySec=1us \
-        --on-active="$minutes"min \
+        --on-calendar="$(date --utc +'%Y-%m-%d %T UTC' -d "+${minutes}min")" \
         --unit="$unitName" \
         "$command" "${args[@]:3}"
 }
@@ -208,7 +229,7 @@ notify() {
 
 start() {
     if _status | grep -q '.'; then
-        printf "There is already a timer running, with %s minutes remaining\n" "$(_status)"
+        printf "There is already a timer running, with %s minutes remaining\n" "$(time_remaining)"
         exit 1
     else
         run_after_time "${task_minutes}" "screenlock-$(date +%s).timer" \
@@ -224,21 +245,38 @@ start() {
 
 stop() {
     if _status | grep -q '.'; then
-        systemctl --user stop screenlock-*.timer &> /dev/null
-        # systemctl --user stop screenlock-notify-* &> /dev/null
-        printf "Stopped timer\n"
+        remaining="$(time_remaining)"
+        gdbus call --session \
+                --dest org.freedesktop.systemd1 \
+                --object-path /org/freedesktop/systemd1 \
+                --method org.freedesktop.systemd1.Manager.ListUnits |
+                sed -e 's#),#),\n#g' -e 's#[()'\'']##g' |
+                awk 'BEGIN {FS=", "}
+                    /screenlock-/ {
+                        if ($4 == "active") {
+                            sub(/^ /,"")
+                            print $7
+                        }
+                    }' |
+                xargs -n 1 -I '{}' \
+                    gdbus call --session \
+                    --dest org.freedesktop.systemd1 \
+                    --object-path '{}' \
+                    --method org.freedesktop.systemd1.Unit.Stop 'replace' \
+                    &> /dev/null
+        printf "Stopped timer with %s remaining\n" "${remaining}"
     else
         printf "No timer running.\n"
     fi
 }
 
 status() {
-    local timeRemaining
-    timeRemaining="$(_status)"
-    if [ -z "$timeRemaining" ]; then
+    local nextLock
+    nextLock=$(time_remaining)
+    if [ -z "$nextLock" ]; then
         printf "There is no timer running.\n"
     else
-        printf "There is a timer with %s remaining\n" "$timeRemaining"
+        printf "%s to next break\n" "${nextLock}"
     fi
 }
 
