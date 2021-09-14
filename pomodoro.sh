@@ -22,7 +22,8 @@ _create_links() {
     installDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
     ln -sf "${installDir}/pomodoro.sh" "${HOME}/.local/bin/pomodoro"
     if [ "$1" == "1" ]; then
-        ln -sf "${installDir}/screenlock.service" "${HOME}/.config/systemd/user/screenlock.service"
+        printf "Installing with boot...\n"
+        cp -f "${installDir}/screenlock.service" "${HOME}/.config/systemd/user/screenlock.service" &> /dev/null
         systemctl --user daemon-reload
         systemctl --user enable screenlock.service
     fi
@@ -30,7 +31,7 @@ _create_links() {
 
 _install() {
     if _create_links "$1"; then
-        printf "Install successful\n"
+        printf "Install successful\n\n"
         usage
         exit
     else
@@ -76,7 +77,7 @@ _check_wayland_deps() {
     done
 
     if ! grep -q 'swaylock-effects' "$(man -w swaylock)"; then
-        printf "'swaylock' must be fork 'swaylock-effects'"
+        printf "'swaylock' must be fork 'swaylock-effects'\n"
         exit 1
     fi
 }
@@ -306,6 +307,7 @@ break_minutes=10
 notifyBefore=()
 repeat=
 cmd=
+installWithBoot=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -327,6 +329,9 @@ while [[ $# -gt 0 ]]; do
          -r|--repeat )
              repeat="-r"
              ;;
+         --with-boot )
+             installWithBoot=1
+             ;;
          -h|--help )
              usage
              exit
@@ -343,14 +348,6 @@ break_end_time="$(date +%I:%M --date="@${break_end_time_seconds}")"
 if [ -n "$cmd" ]; then
     case "$cmd" in
          install )
-             withBoot=0
-             if [[ "$#" == "1" ]]; then
-                 if [[ "$1" == "--with-boot" ]]; then
-                     withBoot=1
-                 fi
-             fi
-             _install "$withBoot"
-             ;;
          _notify )
              if [[ "$#" == "1" ]]; then
                  _notify "$1"
@@ -358,6 +355,7 @@ if [ -n "$cmd" ]; then
                  printf "'pomodoro _notify' requires an integer argument.\n"
                  exit 1
              fi
+             _install "$installWithBoot"
              ;;
          *)
              "$cmd"

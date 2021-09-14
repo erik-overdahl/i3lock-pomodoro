@@ -2,6 +2,7 @@
 Description=Screenlocking pomodoro
 
 [Service]
+Type=simple
 ExecStart=%h/.local/bin/pomodoro start -t 35 -b 10 -r -n 1 -n 5
 ExecStop=%h/.local/bin/pomodoro stop
 
