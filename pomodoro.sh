@@ -177,53 +177,43 @@ _lock() {
     fi
 }
 
-_notify() {
-    notify-send -t 5000 "Screenlock in $1 minutes"
-}
-
-_status() {
+_time_remaining() {
     gdbus call --session \
         --dest org.freedesktop.systemd1 \
         --object-path /org/freedesktop/systemd1 \
         --method org.freedesktop.systemd1.Manager.ListUnits |
         sed -e 's#),#),\n#g' -e 's#[()'\'']##g' |
-        awk 'BEGIN {FS=","} /screenlock-[0-9]+.timer/ {print $7}' |
-        xargs -I '{}' \
-            gdbus call --session \
-            --dest org.freedesktop.systemd1 \
-            --object-path '{}' \
-            --method org.freedesktop.DBus.Properties.Get \
-            org.freedesktop.systemd1.Timer \
-            TimersCalendar  |
         awk '
             BEGIN {
                 FS=", ";
             }
-            {
-                gsub(/[(<>)\[\]]/, "");
-                cmd = "date +'\''%s'\'' -d " $2;
-                if ((cmd | getline res) > 0) {
-                    diff = res - systime();
-                    _hours = int(diff / 3600);
-                    hours = _hours > 0 ? _hours " hours " : "";
-                    _minutes = int((diff % 3600) / 60);
-                    minutes = _minutes > 0 ? _minutes " minutes" : "";
-                    _seconds = int((diff % 60));
-                    seconds = _seconds > 0 ? " and " _seconds " seconds" : "";
-                    print hours minutes seconds;
+            /screenlock-[0-9]+.timer/ {
+                getTime="gdbus call --session --dest org.freedesktop.systemd1 --object-path " $7 " --method org.freedesktop.DBus.Properties.Get org.freedesktop.systemd1.Timer TimersCalendar";
+                if ((getTime | getline timeRes) > 0) {
+                    gsub(/[(<>)\[\]]/, "", timeRes);
+                    time = split(timeRes,array,",");
+                    cmd = "date +'\''%s'\'' -d " array[2];
+                    if ((cmd | getline res) > 0) {
+                        diff = res - systime();
+                        _hours = int(diff / 3600);
+                        hours = _hours > 0 ? _hours " hours " : "";
+                        _minutes = int((diff % 3600) / 60);
+                        minutes = _minutes > 0 ? _minutes " minutes" : "";
+                        _and = minutes > 0 ? " and " : "";
+                        _seconds = int((diff % 60));
+                        seconds = _seconds > 0 ? _seconds " seconds" : "";
+                        print hours minutes _and seconds;
+                    } else {
+                        print "Date conversion failed";
+                        close(cmd);
+                        exit 1;
+                    }
+                    close(cmd);
                 } else {
-                    print "Date conversion failed"
+                    close(getTime);
+                    exit 0;
                 }
-                close(cmd);
             }'
-}
-
-time_remaining() {
-    local nextLock
-    nextLock=$(_status)
-    if [ -n "${nextLock}" ]; then
-        printf "%s" "${nextLock}"
-    fi
 }
 
 run_after_time() {
@@ -239,34 +229,42 @@ run_after_time() {
         "$command" "${args[@]:3}"
 }
 
-notify() {
+schedule_notify() {
     local timeBefore
     timeBefore="$1"
     run_after_time "$((task_minutes - timeBefore))" \
         "screenlock-$(date +%s)-notify-${timeBefore}-min.timer" \
-        "$progPath" _notify "$timeBefore"
+        notify-send -t 5000 "Screenlock in ${timeBefore} minutes"
 }
 
 start() {
-    if _status | grep -q '.'; then
-        printf "There is already a timer running, with %s minutes remaining\n" "$(time_remaining)"
+    if _time_remaining | grep -q '.'; then
+        printf "There is already a timer running, with %s minutes remaining\n" "$(_time_remaining)"
         exit 1
-    else
-        unitCmd=( "$progPath" "_lock" "$repeat" "-t" "$task_minutes" "-b" "$break_minutes" )
-        for time in "${notifyBefore[@]}"; do
-            if [ "$time" -lt "$task_minutes" ]; then
-                notify "$time" || printf "unable to start notification timer!"
-                unitCmd=( "${unitCmd[@]}" "-n" "$time" )
-            fi
-        done
-        run_after_time "${task_minutes}" "screenlock-$(date +%s).timer" "${unitCmd[@]}"
     fi
-    status
+    unitCmd=( "$progPath" "_lock" "$repeat" "-t" "$task_minutes" "-b" "$break_minutes" )
+    for time in "${notifyBefore[@]}"; do
+        if [ "$time" -lt "$task_minutes" ]; then
+            schedule_notify "$time" || printf "unable to start notification timer!"
+            unitCmd=( "${unitCmd[@]}" "-n" "$time" )
+        fi
+    done
+    if run_after_time "${task_minutes}" "screenlock-$(date +%s).timer" "${unitCmd[@]}"; then
+        msg="Started pomodoro timer; screen locks in $(_time_remaining)."
+        printf "%s\n" "${msg}"
+        notify-send -t 5000 "${msg}"
+    else
+        msg="Failed to start pomodoro timer!"
+        printf "%s\n" "${msg}"
+        notify-send -t 5000 -u critical "${msg}"
+        exit 1
+    fi
 }
 
 stop() {
-    if _status | grep -q '.'; then
-        remaining="$(time_remaining)"
+    local remaining
+    remaining="$(_time_remaining)"
+    if [ -n "$remaining" ]; then
         gdbus call --session \
                 --dest org.freedesktop.systemd1 \
                 --object-path /org/freedesktop/systemd1 \
@@ -285,7 +283,9 @@ stop() {
                     --object-path '{}' \
                     --method org.freedesktop.systemd1.Unit.Stop 'replace' \
                     &> /dev/null
-        printf "Stopped timer with %s remaining\n" "${remaining}"
+        msg="Stopped timer with ${remaining} remaining."
+        printf "%s\n" "${msg}"
+        notify-send -t 5000 "${msg}"
     else
         printf "No timer running.\n"
     fi
@@ -293,7 +293,7 @@ stop() {
 
 status() {
     local nextLock
-    nextLock=$(time_remaining)
+    nextLock=$(_time_remaining)
     if [ -z "$nextLock" ]; then
         printf "There is no timer running.\n"
     else
@@ -311,7 +311,7 @@ installWithBoot=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-         start|stop|status|install|_notify|_lock )
+         start|stop|status|install|_lock )
              cmd="$1"
              ;;
          -b|--break )
@@ -348,13 +348,6 @@ break_end_time="$(date +%I:%M --date="@${break_end_time_seconds}")"
 if [ -n "$cmd" ]; then
     case "$cmd" in
          install )
-         _notify )
-             if [[ "$#" == "1" ]]; then
-                 _notify "$1"
-             else
-                 printf "'pomodoro _notify' requires an integer argument.\n"
-                 exit 1
-             fi
              _install "$installWithBoot"
              ;;
          *)
