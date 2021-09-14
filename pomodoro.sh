@@ -2,7 +2,7 @@
 set -euo pipefail
 
 progPath="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/$(basename "$0")"
-deps=( "convert" "dateutils.ddiff" )
+deps=( "convert" )
 
 usage() {
     printf "pomodoro [OPTIONS] <COMMAND>\n
@@ -190,19 +190,35 @@ _status() {
             --object-path '{}' \
             --method org.freedesktop.DBus.Properties.Get \
             org.freedesktop.systemd1.Timer \
-            TimersCalendar |
-        awk 'BEGIN {FS=", "} {gsub(/[(<>)\[\]]/, ""); print $2}' |
-        xargs -I '{}' date -d 'TZ="UTC+%z" {}'
+            TimersCalendar  |
+        awk '
+            BEGIN {
+                FS=", ";
+            }
+            {
+                gsub(/[(<>)\[\]]/, "");
+                cmd = "date +'\''%s'\'' -d " $2;
+                if ((cmd | getline res) > 0) {
+                    diff = res - systime();
+                    _hours = int(diff / 3600);
+                    hours = _hours > 0 ? _hours " hours " : "";
+                    _minutes = int((diff % 3600) / 60);
+                    minutes = _minutes > 0 ? _minutes " minutes" : "";
+                    _seconds = int((diff % 60));
+                    seconds = _seconds > 0 ? " and " _seconds " seconds" : "";
+                    print hours minutes seconds;
+                } else {
+                    print "Date conversion failed"
+                }
+                close(cmd);
+            }'
 }
 
 time_remaining() {
     local nextLock
     nextLock=$(_status)
     if [ -n "${nextLock}" ]; then
-    dateutils.ddiff -f '%H hours, %M min, and %S seconds' \
-        -i '%a %d %b %Y %T' \
-        "$(date)" \
-        "${nextLock}"
+        printf "%s" "${nextLock}"
     fi
 }
 
