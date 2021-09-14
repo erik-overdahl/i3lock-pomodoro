@@ -168,8 +168,11 @@ _lock() {
     fi
 
     if [ -n "${repeat}" ]; then
-        "$progPath" start -r -t "$task_minutes" -b "$break_minutes" || \
-            notify-send -u critical -a "Screenlock" "Pomodoro repeat failed!"
+        unitCmd=( "$progPath" "start" "$repeat" "-t" "$task_minutes" "-b" "$break_minutes" )
+        for time in "${notifyBefore[@]}"; do
+            unitCmd=( "${unitCmd[@]}" "-n" "$time" )
+        done
+        "${unitCmd[@]}" || notify-send -u critical -a "Screenlock" "Pomodoro repeat failed!"
     fi
 }
 
@@ -248,13 +251,14 @@ start() {
         printf "There is already a timer running, with %s minutes remaining\n" "$(time_remaining)"
         exit 1
     else
-        run_after_time "${task_minutes}" "screenlock-$(date +%s).timer" \
-            "$progPath" _lock "$repeat" -t "$task_minutes" -b "$break_minutes"
+        unitCmd=( "$progPath" "_lock" "$repeat" "-t" "$task_minutes" "-b" "$break_minutes" )
         for time in "${notifyBefore[@]}"; do
             if [ "$time" -lt "$task_minutes" ]; then
                 notify "$time" || printf "unable to start notification timer!"
+                unitCmd=( "${unitCmd[@]}" "-n" "$time" )
             fi
         done
+        run_after_time "${task_minutes}" "screenlock-$(date +%s).timer" "${unitCmd[@]}"
     fi
     status
 }
@@ -332,9 +336,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 
-break_start_time=$(date +%s --date="$(date +'%F %H%M')")
-break_end_time_seconds=$((break_start_time + $((60 * break_minutes))))
-break_end_time=$(date +%I:%M --date="@${break_end_time_seconds}")
+break_start_time="$(date +%s --date="$(date +'%F %H%M')")"
+break_end_time_seconds="$((break_start_time + $((60 * break_minutes))))"
+break_end_time="$(date +%I:%M --date="@${break_end_time_seconds}")"
 
 if [ -n "$cmd" ]; then
     case "$cmd" in
