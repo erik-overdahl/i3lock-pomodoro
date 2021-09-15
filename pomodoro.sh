@@ -218,6 +218,15 @@ _time_remaining() {
             }'
 }
 
+_print_notify() {
+    printf "%s\n" "${1}"
+    if [ "$#" -gt 1 ]; then
+        notify-send -t 5000 -u critical "${1}"
+    else
+        notify-send -t 5000 "${1}"
+    fi
+}
+
 run_after_time() {
     local args=( "$@" )
     local minutes="${args[0]}"
@@ -240,17 +249,12 @@ schedule_notify() {
 }
 
 start() {
-    break_start_time="$(date +%s --date="$(date +'%F %H%M')")"
-    break_end_time_seconds="$((break_start_time + $((60 * break_minutes))))"
-    break_end_time="$(date +%I:%M --date="@${break_end_time_seconds}")"
-    defaultNotify=( 1 5 )
-
     if _time_remaining | grep -q '.'; then
         printf "There is already a timer running, with %s minutes remaining\n" "$(_time_remaining)"
         exit 1
     fi
     if [ "${#notifyBefore[@]}" == 0 ]; then
-        notifyBefore="${defaultNotify[*]}"
+        notifyBefore=( "${defaultNotify[@]}" )
     fi
     unitCmd=( "$progPath" "_lock" "$repeat" "-t" "$task_minutes" "-b" "$break_minutes" )
     for time in "${notifyBefore[@]}"; do
@@ -260,13 +264,9 @@ start() {
         fi
     done
     if run_after_time "${task_minutes}" "screenlock-$(date +%s).timer" "${unitCmd[@]}"; then
-        msg="Started pomodoro timer; screen locks in $(_time_remaining)."
-        printf "%s\n" "${msg}"
-        notify-send -t 5000 "${msg}"
+        _print_notify "Started pomodoro timer; screen locks in $(_time_remaining)."
     else
-        msg="Failed to start pomodoro timer!"
-        printf "%s\n" "${msg}"
-        notify-send -t 5000 -u critical "${msg}"
+        _print_notify "Failed to start pomodoro timer!" "critical"
         exit 1
     fi
 }
@@ -294,9 +294,7 @@ stop() {
                 --method org.freedesktop.systemd1.Unit.Stop 'replace' \
                 &> /dev/null
 
-        msg="Stopped timer with ${remaining} remaining."
-        printf "%s\n" "${msg}"
-        notify-send -t 5000 "${msg}"
+        _print_notify "Stopped timer with ${remaining} remaining."
     else
         printf "No timer running.\n"
     fi
@@ -304,12 +302,14 @@ stop() {
 
 status() {
     local nextLock
+    local msg
     nextLock=$(_time_remaining)
     if [ -z "$nextLock" ]; then
-        printf "There is no timer running.\n"
+        msg="There is no timer running."
     else
-        printf "%s to next break\n" "${nextLock}"
+        msg="${nextLock} to next break"
     fi
+    _print_notify "${msg}"
 }
 
 task_minutes=35
@@ -349,6 +349,11 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
+
+break_start_time="$(date +%s --date="$(date +'%F %H%M')")"
+break_end_time_seconds="$((break_start_time + $((60 * break_minutes))))"
+break_end_time="$(date +%I:%M --date="@${break_end_time_seconds}")"
+defaultNotify=( 1 5 )
 
 if [ -n "$cmd" ]; then
     case "$cmd" in
