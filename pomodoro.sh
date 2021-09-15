@@ -23,7 +23,7 @@ _create_links() {
     ln -sf "${installDir}/pomodoro.sh" "${HOME}/.local/bin/pomodoro"
     if [ "$1" == "1" ]; then
         printf "Installing with boot...\n"
-        cp -f "${installDir}/screenlock.service" "${HOME}/.config/systemd/user/screenlock.service" &> /dev/null
+        cp -f "${installDir}/screenlock.service" "${HOME}/.config/systemd/user/screenlock.service"
         systemctl --user daemon-reload
         systemctl --user enable screenlock.service
     fi
@@ -173,7 +173,9 @@ _lock() {
         for time in "${notifyBefore[@]}"; do
             unitCmd=( "${unitCmd[@]}" "-n" "$time" )
         done
-        "${unitCmd[@]}" || notify-send -u critical -a "Screenlock" "Pomodoro repeat failed!"
+        "${unitCmd[@]}" || \
+            (notify-send -u critical -a "Screenlock" "Pomodoro repeat failed!" \
+            && printf "Pomodoro repeat failed!")
     fi
 }
 
@@ -199,8 +201,8 @@ _time_remaining() {
                         hours = _hours > 0 ? _hours " hours " : "";
                         _minutes = int((diff % 3600) / 60);
                         minutes = _minutes > 0 ? _minutes " minutes" : "";
-                        _and = minutes > 0 ? " and " : "";
                         _seconds = int((diff % 60));
+                        _and = ((_minutes + _hours) > 0 && _seconds > 0) ? " and " : "";
                         seconds = _seconds > 0 ? _seconds " seconds" : "";
                         print hours minutes _and seconds;
                     } else {
@@ -238,9 +240,17 @@ schedule_notify() {
 }
 
 start() {
+    break_start_time="$(date +%s --date="$(date +'%F %H%M')")"
+    break_end_time_seconds="$((break_start_time + $((60 * break_minutes))))"
+    break_end_time="$(date +%I:%M --date="@${break_end_time_seconds}")"
+    defaultNotify=( 1 5 )
+
     if _time_remaining | grep -q '.'; then
         printf "There is already a timer running, with %s minutes remaining\n" "$(_time_remaining)"
         exit 1
+    fi
+    if [ "${#notifyBefore[@]}" == 0 ]; then
+        notifyBefore="${defaultNotify[*]}"
     fi
     unitCmd=( "$progPath" "_lock" "$repeat" "-t" "$task_minutes" "-b" "$break_minutes" )
     for time in "${notifyBefore[@]}"; do
@@ -266,23 +276,24 @@ stop() {
     remaining="$(_time_remaining)"
     if [ -n "$remaining" ]; then
         gdbus call --session \
+            --dest org.freedesktop.systemd1 \
+            --object-path /org/freedesktop/systemd1 \
+            --method org.freedesktop.systemd1.Manager.ListUnits |
+            sed -e 's#),#),\n#g' -e 's#[()'\'']##g' |
+            awk 'BEGIN {FS=", "}
+                /screenlock-/ {
+                    if ($4 == "active") {
+                        sub(/^ /,"")
+                        print $7
+                    }
+                }' |
+            xargs -n 1 -I '{}' \
+                gdbus call --session \
                 --dest org.freedesktop.systemd1 \
-                --object-path /org/freedesktop/systemd1 \
-                --method org.freedesktop.systemd1.Manager.ListUnits |
-                sed -e 's#),#),\n#g' -e 's#[()'\'']##g' |
-                awk 'BEGIN {FS=", "}
-                    /screenlock-/ {
-                        if ($4 == "active") {
-                            sub(/^ /,"")
-                            print $7
-                        }
-                    }' |
-                xargs -n 1 -I '{}' \
-                    gdbus call --session \
-                    --dest org.freedesktop.systemd1 \
-                    --object-path '{}' \
-                    --method org.freedesktop.systemd1.Unit.Stop 'replace' \
-                    &> /dev/null
+                --object-path '{}' \
+                --method org.freedesktop.systemd1.Unit.Stop 'replace' \
+                &> /dev/null
+
         msg="Stopped timer with ${remaining} remaining."
         printf "%s\n" "${msg}"
         notify-send -t 5000 "${msg}"
@@ -302,7 +313,6 @@ status() {
 }
 
 task_minutes=35
-break_minutes=10
 break_minutes=10
 notifyBefore=()
 repeat=
@@ -339,11 +349,6 @@ while [[ $# -gt 0 ]]; do
     esac
     shift
 done
-
-
-break_start_time="$(date +%s --date="$(date +'%F %H%M')")"
-break_end_time_seconds="$((break_start_time + $((60 * break_minutes))))"
-break_end_time="$(date +%I:%M --date="@${break_end_time_seconds}")"
 
 if [ -n "$cmd" ]; then
     case "$cmd" in
