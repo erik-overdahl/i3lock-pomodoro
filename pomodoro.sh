@@ -12,7 +12,7 @@ COMMANDS
 OPTIONS
   -t|--time  MINUTES   minutes before break (default 35)
   -b|--break MINUTES   length of break (default 10)
-  -r|--repeat          repeat the timer
+  -R|--no-repeat       do not repeat the timer
   -n|--notify MINUTES  notify MINUTES before screen locks
   -h|--help            show this help\n"
 }
@@ -168,8 +168,8 @@ _lock() {
         rm "${screenshot_filename}"
     fi
 
-    if [ -n "${repeat}" ]; then
-        unitCmd=( "$progPath" "start" "$repeat" "-t" "$task_minutes" "-b" "$break_minutes" )
+    if [ "${noRepeat}" != 1 ]; then
+        unitCmd=( "$progPath" "start" "-t" "$task_minutes" "-b" "$break_minutes" )
         for time in "${notifyBefore[@]}"; do
             unitCmd=( "${unitCmd[@]}" "-n" "$time" )
         done
@@ -256,7 +256,7 @@ start() {
     if [ "${#notifyBefore[@]}" == 0 ]; then
         notifyBefore=( "${defaultNotify[@]}" )
     fi
-    unitCmd=( "$progPath" "_lock" "$repeat" "-t" "$task_minutes" "-b" "$break_minutes" )
+    unitCmd=( "$progPath" "_lock" "-t" "$task_minutes" "-b" "$break_minutes" )
     for time in "${notifyBefore[@]}"; do
         if [ "$time" -lt "$task_minutes" ]; then
             schedule_notify "$time" || printf "unable to start notification timer!"
@@ -315,7 +315,7 @@ status() {
 task_minutes=35
 break_minutes=10
 notifyBefore=()
-repeat=
+noRepeat=0
 cmd=
 installWithBoot=0
 
@@ -336,8 +336,8 @@ while [[ $# -gt 0 ]]; do
              shift
              task_minutes="$1"
              ;;
-         -r|--repeat )
-             repeat="-r"
+         -R|--no-repeat )
+             noRepeat=1
              ;;
          --with-boot )
              installWithBoot=1

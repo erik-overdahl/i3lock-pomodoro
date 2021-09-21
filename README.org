@@ -27,7 +27,7 @@ COMMANDS
 OPTIONS
   -t|--time  MINUTES   minutes before break (default 35)
   -b|--break MINUTES   length of break (default 10)
-  -r|--repeat          repeat the timer
+  -R|--no-repeat       do not repeat the timer
   -n|--notify MINUTES  notify MINUTES before screen locks
   -h|--help            show this help
 #+end_example
@@ -36,7 +36,7 @@ For example, to start a repeating 35 minute timer with a 10 minute break that
 notifies you 5 and 1 minutes before the screen locks, run:
 
 #+begin_src shell
-pomdoro start -t 35 -b 10 -r -n 1 -n 5
+pomdoro start -t 35 -b 10 -n 1 -n 5
 #+end_src
 
 * Install
