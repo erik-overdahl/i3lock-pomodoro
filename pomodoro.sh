@@ -3,6 +3,7 @@ set -euo pipefail
 
 progPath="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/$(basename "$0")"
 deps=( "convert" )
+configDir="${XDG_CONFIG_HOME:-${HOME}/.config}/pomodoro"
 
 usage() {
     printf "pomodoro [OPTIONS] <COMMAND>\n
@@ -21,7 +22,11 @@ _create_links() {
     local installDir
     installDir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
     ln -sf "${installDir}/pomodoro.sh" "${HOME}/.local/bin/pomodoro"
+    mkdir -p "${configDir}"
+    ln -sf "${installDir}/messages.txt" "${configDir}/messages.txt"
     if [ "$1" == "1" ]; then
+        # systemd user files don't always seem to work, or work the same across systems
+        # this is my best effort
         printf "Installing with boot...\n"
         cp -f "${installDir}/screenlock.service" "${HOME}/.config/systemd/user/screenlock.service"
         systemctl --user daemon-reload
@@ -109,7 +114,7 @@ _x_lock_screen() {
         --verif-text=""  \
         --wrong-text=""  \
         --noinput-text="" \
-        --greeter-text="Time for a ${break_minutes} minute break"  \
+        --greeter-text="${break_minutes} minute break; time to ${break_message}"  \
         --greeter-align=0  \
         --greeter-pos="w/2:h/2" \
         --greeter-color="ff0000cc"  \
@@ -140,7 +145,7 @@ _wayland_lock_screen() {
         --clock \
         --text-color ff0000ff \
         --timestr "%T  --  ${break_end_time}" \
-        --datestr "Time for a ${break_minutes} minute break" \
+        --datestr "${break_minutes} minute break; time to ${break_message}" \
         --ring-color ffffff00 \
         --inside-color ffffff00 \
         --line-color ffffff00 \
@@ -159,6 +164,7 @@ _lock() {
         _check_i3_deps
     fi
     _make_background
+    break_message="$(choose_break_message)"
     "$lock_screen"
     while [ "$(date +%s)" -lt "${break_end_time_seconds}" ]; do
         "$lock_screen"
@@ -238,6 +244,10 @@ run_after_time() {
         --on-calendar="$(date --utc +'%Y-%m-%d %T UTC' -d "+${minutes}min")" \
         --unit="$unitName" \
         "$command" "${args[@]:3}"
+}
+
+choose_break_message() {
+    sort -R "${configDir}/messages.txt" | head -n 1
 }
 
 schedule_notify() {
