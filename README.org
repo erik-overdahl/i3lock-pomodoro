@@ -22,7 +22,7 @@ pomodoro [OPTIONS] <COMMAND>
 Schedule the screen to lock for B minutes in T minutes from now
 
 COMMANDS
-  start    stop    status    install
+  start    halt    check    install
 
 OPTIONS
   -t|--time  MINUTES   minutes before break (default 35)
@@ -60,3 +60,10 @@ change behavior without chasing all over the file system.)
 
 ~pomodoro install~ has an optional ~--with-boot~ that adds a systemd user
 service to run the timer on startup.
+
+* Messages
+The lock screen displays a message chosen a random from a file
+~messages.txt~, which is stored in the app's config directory (by
+default, ~$XDG_CONFIG_HOME/pomodoro~ or ~$HOME/.config/pomodoro~). The
+format is ~"${break_minutes} minute break; time to ${message}"~, where
+message is a randomly chosen line from ~messages.txt~.

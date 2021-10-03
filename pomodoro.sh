@@ -9,7 +9,7 @@ usage() {
     printf "pomodoro [OPTIONS] <COMMAND>\n
 Schedule the screen to lock for B minutes in T minutes from now\n
 COMMANDS
-  start    stop    status    install\n
+  start    halt    check    install\n
 OPTIONS
   -t|--time  MINUTES   minutes before break (default 35)
   -b|--break MINUTES   length of break (default 10)
@@ -24,6 +24,10 @@ _create_links() {
     ln -sf "${installDir}/pomodoro.sh" "${HOME}/.local/bin/pomodoro"
     mkdir -p "${configDir}"
     ln -sf "${installDir}/messages.txt" "${configDir}/messages.txt"
+    completionDir="${XDG_DATA_HOME:-${HOME}/.local/share}/bash-completion"
+    mkdir -p "${completionDir}"
+    cp -f "${installDir}/pomodoro-completion.bash" "${completionDir}/pomodoro-completion"
+    source "${completionDir}/pomodoro-completion"
     if [ "$1" == "1" ]; then
         # systemd user files don't always seem to work, or work the same across systems
         # this is my best effort
@@ -281,7 +285,7 @@ start() {
     fi
 }
 
-stop() {
+halt() {
     local remaining
     remaining="$(_time_remaining)"
     if [ -n "$remaining" ]; then
@@ -310,7 +314,7 @@ stop() {
     fi
 }
 
-status() {
+check() {
     local nextLock
     local msg
     nextLock=$(_time_remaining)
@@ -331,7 +335,7 @@ installWithBoot=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-         start|stop|status|install|_lock )
+         start|halt|check|install|_lock )
              cmd="$1"
              ;;
          -b|--break )
